@@ -1,3 +1,5 @@
+NO RELEASES PROVIDED UNTIL MICYOU LICENSE ALLOWED PLUGIN LICENSES BESIDES GPL
+DEVELOPING REPO FOR NOW
 # WhatdidIsay - MicYou Voice Transcription Plugin
 # WhatdidIsay - MicYou 语音转录插件
 
@@ -14,9 +16,9 @@ The current version is **not** recommended for general daily use. It is strictly
 ## **1. I NEED IT RIGHT NOW.**
 ## **1. 我急着用。**
 
-2\. I am developing a MicYou plugin and want to see how others implement it under the hood.
+2\. I am developing a MicYou plugin and want to see how others implement it.
 
-2\. 我在开发 MicYou 插件，想看看别人底层是怎么做的。
+2\. 我在开发 MicYou 插件，想看看别人是怎么做的。
 
 3\. I don't mind having a 3GB AI model running in the background at all times.
 
