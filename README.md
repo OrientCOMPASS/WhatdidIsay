@@ -1,5 +1,3 @@
-NO RELEASES PROVIDED UNTIL MICYOU LICENSE ALLOWED PLUGIN LICENSES BESIDES GPL
-DEVELOPING REPO FOR NOW
 # WhatdidIsay - MicYou Voice Transcription Plugin
 # WhatdidIsay - MicYou 语音转录插件
 
