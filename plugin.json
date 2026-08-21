@@ -1,7 +1,7 @@
 {
   "id": "opss.whatdidisay",
   "name": "WhatdidIsay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Transcribe your talk into text records every time you use MicYou.",
   "license": "Unlicense",
   "runtime": "native",
@@ -13,8 +13,7 @@
   "kind": "dsp",
   "dsp": { "insertAfter": "AEC" },
   "config": {
-    "loadTiming": "device_connect",
-    "targetLanguage": "zh"
+    "loadTiming": "device_connect"
   },
   "configSchema": {
     "fields": [
@@ -26,63 +25,6 @@
         "options": [
           { "value": "micyou_start", "label": "MicYou 启动时" },
           { "value": "device_connect", "label": "设备连接时" }
-        ]
-      },
-      {
-        "key": "targetLanguage",
-        "fieldType": "select",
-        "label": "目标识别语言 (Whisper)",
-        "options": [
-          { "value": "en", "label": "English (en)" }, { "value": "zh", "label": "中文 (zh)" },
-          { "value": "de", "label": "Deutsch (de)" }, { "value": "es", "label": "Español (es)" },
-          { "value": "ru", "label": "Русский (ru)" }, { "value": "ko", "label": "한국어 (ko)" },
-          { "value": "fr", "label": "Français (fr)" }, { "value": "ja", "label": "日本語 (ja)" },
-          { "value": "pt", "label": "Português (pt)" }, { "value": "tr", "label": "Türkçe (tr)" },
-          { "value": "pl", "label": "Polski (pl)" }, { "value": "ca", "label": "Català (ca)" },
-          { "value": "nl", "label": "Nederlands (nl)" }, { "value": "ar", "label": "العربية (ar)" },
-          { "value": "sv", "label": "Svenska (sv)" }, { "value": "it", "label": "Italiano (it)" },
-          { "value": "id", "label": "Bahasa Indonesia (id)" }, { "value": "hi", "label": "हिन्दी (hi)" },
-          { "value": "fi", "label": "Suomi (fi)" }, { "value": "vi", "label": "Tiếng Việt (vi)" },
-          { "value": "he", "label": "עברית (he)" }, { "value": "uk", "label": "Українська (uk)" },
-          { "value": "el", "label": "Ελληνικά (el)" }, { "value": "ms", "label": "Bahasa Melayu (ms)" },
-          { "value": "cs", "label": "Čeština (cs)" }, { "value": "ro", "label": "Română (ro)" },
-          { "value": "da", "label": "Dansk (da)" }, { "value": "hu", "label": "Magyar (hu)" },
-          { "value": "ta", "label": "தமிழ் (ta)" }, { "value": "no", "label": "Norsk (no)" },
-          { "value": "th", "label": "ภาษาไทย (th)" }, { "value": "ur", "label": "اردو (ur)" },
-          { "value": "hr", "label": "Hrvatski (hr)" }, { "value": "bg", "label": "Български (bg)" },
-          { "value": "lt", "label": "Lietuvių (lt)" }, { "value": "la", "label": "Latina (la)" },
-          { "value": "mi", "label": "Māori (mi)" }, { "value": "ml", "label": "മലയാളം (ml)" },
-          { "value": "cy", "label": "Cymraeg (cy)" }, { "value": "sk", "label": "Slovenčina (sk)" },
-          { "value": "te", "label": "తెలుగు (te)" }, { "value": "fa", "label": "فارسی (fa)" },
-          { "value": "lv", "label": "Latviešu (lv)" }, { "value": "bn", "label": "বাংলা (bn)" },
-          { "value": "sr", "label": "Српски (sr)" }, { "value": "az", "label": "Azərbaycan (az)" },
-          { "value": "sl", "label": "Slovenščina (sl)" }, { "value": "kn", "label": "ಕನ್ನಡ (kn)" },
-          { "value": "et", "label": "Eesti (et)" }, { "value": "mk", "label": "Македонски (mk)" },
-          { "value": "br", "label": "Brezhoneg (br)" }, { "value": "eu", "label": "Euskara (eu)" },
-          { "value": "is", "label": "Íslenska (is)" }, { "value": "hy", "label": "Հայերեն (hy)" },
-          { "value": "ne", "label": "नेपाली (ne)" }, { "value": "mn", "label": "Монгол (mn)" },
-          { "value": "bs", "label": "Bosanski (bs)" }, { "value": "kk", "label": "Қазақ (kk)" },
-          { "value": "sq", "label": "Shqip (sq)" }, { "value": "sw", "label": "Kiswahili (sw)" },
-          { "value": "gl", "label": "Galego (gl)" }, { "value": "mr", "label": "मराठी (mr)" },
-          { "value": "pa", "label": "ਪੰਜਾਬੀ (pa)" }, { "value": "si", "label": "සිංහල (si)" },
-          { "value": "km", "label": "ខ្មែរ (km)" }, { "value": "sn", "label": "ChiShona (sn)" },
-          { "value": "yo", "label": "Yorùbá (yo)" }, { "value": "so", "label": "Soomaali (so)" },
-          { "value": "af", "label": "Afrikaans (af)" }, { "value": "oc", "label": "Occitan (oc)" },
-          { "value": "ka", "label": "ქართული (ka)" }, { "value": "be", "label": "Беларуская (be)" },
-          { "value": "tg", "label": "Тоҷикӣ (tg)" }, { "value": "sd", "label": "سنڌي (sd)" },
-          { "value": "gu", "label": "ગુજરાતી (gu)" }, { "value": "am", "label": "አማርኛ (am)" },
-          { "value": "yi", "label": "ייִדיש (yi)" }, { "value": "lo", "label": "ລາວ (lo)" },
-          { "value": "uz", "label": "Oʻzbek (uz)" }, { "value": "fo", "label": "Føroyskt (fo)" },
-          { "value": "ht", "label": "Kreyòl ayisyen (ht)" }, { "value": "ps", "label": "پښتو (ps)" },
-          { "value": "tk", "label": "Türkmen (tk)" }, { "value": "nn", "label": "Nynorsk (nn)" },
-          { "value": "mt", "label": "Malti (mt)" }, { "value": "sa", "label": "संस्कृत (sa)" },
-          { "value": "lb", "label": "Lëtzebuergesch (lb)" }, { "value": "my", "label": "မြန်မာ (my)" },
-          { "value": "bo", "label": "བོད་སྐད་ (bo)" }, { "value": "tl", "label": "Tagalog (tl)" },
-          { "value": "mg", "label": "Malagasy (mg)" }, { "value": "as", "label": "অসমীয়া (as)" },
-          { "value": "tt", "label": "Татар (tt)" }, { "value": "haw", "label": "ʻŌlelo Hawaiʻi (haw)" },
-          { "value": "ln", "label": "Lingála (ln)" }, { "value": "ha", "label": "Hausa (ha)" },
-          { "value": "ba", "label": "Башҡорт (ba)" }, { "value": "jw", "label": "Basa Jawa (jw)" },
-          { "value": "su", "label": "Basa Sunda (su)" }
         ]
       }
     ]

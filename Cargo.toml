@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "WhatdidIsay"
+name = "WhatdidIsay" # 对应 plugin.json 中的 entry: "WhatdidIsay.dll"
 crate-type = ["cdylib"]
+
+[dependencies]
+sherpa-onnx = "1.13.5"
+chrono = "0.4"
