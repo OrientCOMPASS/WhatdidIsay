@@ -1,0 +1,94 @@
+name: Manual Build & Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .dll
+            asset_name: WhatdidIsay.dll
+            platform: windows
+            
+          # Linux x86_64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: .so
+            asset_name: libwhatdidisay.so
+            platform: linux
+            
+          # macOS Intel (x86_64)
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: .dylib
+            asset_name: libwhatdidisay.dylib
+            platform: macos
+            
+          # 如果需要支持 Apple Silicon (M1/M2/M3)，取消下面这段的注释
+          # - os: macos-latest
+          #   target: aarch64-apple-darwin
+          #   ext: .dylib
+          #   asset_name: libwhatdidisay.dylib
+          #   platform: macos
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Release Binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare Plugin Package
+        shell: bash
+        run: |
+          mkdir -p dist/opss.whatdidisay
+          cp README.md dist/opss.whatdidisay/
+          
+          # 复制编译产物并重命名
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cp target/${{ matrix.target }}/release/whatdidisay.dll dist/opss.whatdidisay/${{ matrix.asset_name }}
+          else
+            cp target/${{ matrix.target }}/release/libwhatdidisay${{ matrix.ext }} dist/opss.whatdidisay/${{ matrix.asset_name }}
+          fi
+          
+          # 使用 Python 动态修改 plugin.json 的 entry 和 platforms 字段
+          python3 -c "
+          import json
+          with open('plugin.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          
+          data['entry'] = '${{ matrix.asset_name }}'
+          data['platforms'] = ['${{ matrix.platform }}']
+          # 移除可能冲突的 arches 字段，让宿主自动检测
+          if 'arches' in data:
+              del data['arches']
+              
+          with open('dist/opss.whatdidisay/plugin.json', 'w', encoding='utf-8') as f:
+              json.dump(data, f, indent=2, ensure_ascii=False)
+          "
+
+      - name: Zip Package
+        uses: thedoctor0/zip-release@main
+        with:
+          type: 'zip'
+          filename: 'whatdidisay-${{ matrix.platform }}-${{ matrix.target }}.zip'
+          path: 'dist/opss.whatdidisay'
+
+      - name: Upload Artifact for Manual Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: whatdidisay-${{ matrix.platform }}
+          path: 'whatdidisay-${{ matrix.platform }}-${{ matrix.target }}.zip'
+          retention-days: 30 # Artifact 保留 30 天
