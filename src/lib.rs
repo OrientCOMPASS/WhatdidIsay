@@ -19,7 +19,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc, Condvar, Mutex, OnceLock,
 };
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 // ==================== ABI ====================
 #[repr(C)]
@@ -59,8 +59,7 @@ pub struct mpl_host_api_t {
     pub set_interval: unsafe extern "C" fn(*mut c_void, u64, *const c_char, *mut u64) -> mpl_result_t,
     pub clear_interval: unsafe extern "C" fn(*mut c_void, u64) -> mpl_result_t,
     pub open_url: unsafe extern "C" fn(*mut c_void, *const c_char) -> mpl_result_t,
-    // 【注意】notify 字段必须保留以维持 ABI 内存布局对齐，但我们在代码中不再调用它
-    pub notify: unsafe extern "C" fn(*mut c_void, *const c_char, *const c_char) -> mpl_result_t, 
+    pub notify: unsafe extern "C" fn(*mut c_void, *const c_char, *const c_char) -> mpl_result_t,
     pub locale: unsafe extern "C" fn(*mut c_void, *mut c_char, *mut u32) -> mpl_result_t,
     pub host_info: unsafe extern "C" fn(*mut c_void, *mut c_char, *mut u32) -> mpl_result_t,
     pub clipboard_read: unsafe extern "C" fn(*mut c_void, *mut c_char, *mut u32) -> mpl_result_t,
@@ -173,11 +172,13 @@ struct PluginState {
     plugin_dir: String,
     config: Config,
     asr_thread: Option<std::thread::JoinHandle<()>>,
+    notify_flag: Arc<AtomicBool>, // 用于热更新通知开关，避免重启模型
 }
 
 #[derive(Debug, Clone)]
 struct Config {
     load_timing: String,
+    notify_model_status: bool,
     sample_rate: u32,
     channels: u32,
 }
@@ -208,7 +209,7 @@ fn log_msg(msg: &str) {
         if let Ok(c) = CString::new(msg) { unsafe { (h.log)(h.ctx, 2, c.as_ptr()) }; }
     }
     if let Some(f) = LOG_FILE.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
-        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+        let ts = std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let _ = writeln!(f, "[{}] {}", ts, msg);
     }
 }
@@ -303,7 +304,7 @@ fn process_audio_chunk(
 }
 
 // ==================== 线程管理 ====================
-fn spawn_asr_thread(dir: String, cfg: Config) -> Option<std::thread::JoinHandle<()>> {
+fn spawn_asr_thread(dir: String, cfg: Config, notify_flag: Arc<AtomicBool>) -> Option<std::thread::JoinHandle<()>> {
     let ring = RING.get().unwrap().clone();
     let handle = std::thread::spawn(move || {
         log_msg("[ASR] Thread started. Loading models...");
@@ -356,6 +357,14 @@ fn spawn_asr_thread(dir: String, cfg: Config) -> Option<std::thread::JoinHandle<
         };
         
         log_msg("[ASR] ASR model loaded. Ready.");
+        let host_opt = HOST_API.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        if let Some(host) = host_opt {
+            if notify_flag.load(Ordering::SeqCst) {
+                if let (Ok(t), Ok(b)) = (CString::new("MicYou ASR"), CString::new("模型加载完成，开始记录。")) {
+                    unsafe { (host.notify)(host.ctx, t.as_ptr(), b.as_ptr()); }
+                }
+            }
+        }
 
         // 3. Setup TranscriptWriter
         let save_dir = format!("{}/records", dir);
@@ -430,8 +439,26 @@ fn spawn_asr_thread(dir: String, cfg: Config) -> Option<std::thread::JoinHandle<
                                 if !text.is_empty() {
                                     let elapsed_secs = start_sample as f64 / 16000.0;
                                     let real_time = first_audio_ts.unwrap() + Duration::from_secs_f64(elapsed_secs);
-                                    // 仅记录到文件，不在日志中打印识别结果
                                     writer.write(real_time, text);
+                                    
+                                    // 2. 【新增】构建二进制 IPC 消息并广播
+                                    if let Some(host) = HOST_API.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+                                        let start_ms = real_time.duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+                                        let duration_ms = (samples.len() as f64 / 16000.0 * 1000.0) as i64;
+                                        let end_ms = start_ms + duration_ms;
+                                        
+                                        // 协议: "WDIS" (4B) + start_ms (8B) + end_ms (8B) + text (UTF-8)
+                                        let mut payload = Vec::with_capacity(20 + text.len());
+                                        payload.extend_from_slice(b"WDIS");
+                                        payload.extend_from_slice(&start_ms.to_le_bytes());
+                                        payload.extend_from_slice(&end_ms.to_le_bytes());
+                                        payload.extend_from_slice(text.as_bytes());
+                                        
+                                        let target = CString::new(r#"{"type":"broadcast"}"#).unwrap();
+                                        unsafe {
+                                            (host.send_message)(host.ctx, target.as_ptr(), payload.as_ptr(), payload.len() as u32);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -464,6 +491,15 @@ fn spawn_asr_thread(dir: String, cfg: Config) -> Option<std::thread::JoinHandle<
             vad.pop();
         }
 
+        // 【新增】模型卸载通知
+        if let Some(host) = HOST_API.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+            if notify_flag.load(Ordering::SeqCst) {
+                if let (Ok(t), Ok(b)) = (CString::new("MicYou ASR"), CString::new("模型已卸载，停止记录。")) {
+                    unsafe { (host.notify)(host.ctx, t.as_ptr(), b.as_ptr()); }
+                }
+            }
+        }
+
         ring.is_io_alive.store(false, Ordering::SeqCst);
         log_msg("[ASR] Thread exited.");
     });
@@ -471,11 +507,11 @@ fn spawn_asr_thread(dir: String, cfg: Config) -> Option<std::thread::JoinHandle<
 }
 
 fn start_asr_thread() {
-    let (dir, cfg) = {
+    let (dir, cfg, notify_flag) = {
         let lk = STATE.lock().unwrap_or_else(|e| e.into_inner());
         match lk.as_ref() {
             Some(s) if s.asr_thread.is_some() && RING.get().map_or(false, |r| r.is_io_alive.load(Ordering::SeqCst)) => return,
-            Some(s) => (s.plugin_dir.clone(), s.config.clone()),
+            Some(s) => (s.plugin_dir.clone(), s.config.clone(), s.notify_flag.clone()),
             None => return,
         }
     };
@@ -483,7 +519,7 @@ fn start_asr_thread() {
     if let Some(r) = RING.get() { r.reset(); r.is_running.store(false, Ordering::SeqCst); r.is_ready.store(false, Ordering::SeqCst); }
     stop_asr_thread();
 
-    let handle = spawn_asr_thread(dir, cfg);
+    let handle = spawn_asr_thread(dir, cfg, notify_flag);
 
     if handle.is_some() {
         let mut lk = STATE.lock().unwrap_or_else(|e| e.into_inner());
@@ -519,7 +555,7 @@ pub extern "C" fn micyou_plugin_info() -> *const mpl_plugin_info_t {
     static I: mpl_plugin_info_t = mpl_plugin_info_t {
         abi_version: 1, api_version: 1,
         id: b"opss.whatdidisay\0" as *const u8 as *const c_char,
-        version: b"0.3.0\0" as *const u8 as *const c_char
+        version: b"0.4.0\0" as *const u8 as *const c_char
     };
     &I
 }
@@ -541,6 +577,8 @@ pub extern "C" fn micyou_plugin_init(host: *const mpl_host_api_t) -> mpl_result_
         init_log(&dir);
 
         let timing = read_cfg(h, h.ctx, "loadTiming");
+        let notify_str = read_cfg(h, h.ctx, "notifyModelStatus");
+        let notify_enabled = notify_str != "false";
 
         let (mut sr, mut ch) = (48000u32, 2u32);
         let mut b = [0u8; 256]; let mut sz = b.len() as u32;
@@ -552,12 +590,15 @@ pub extern "C" fn micyou_plugin_init(host: *const mpl_host_api_t) -> mpl_result_
 
         let cfg = Config {
             load_timing: if timing.is_empty() { "device_connect".into() } else { timing },
+            notify_model_status: notify_enabled,
             sample_rate: sr,
             channels: ch,
         };
 
+        let notify_flag = Arc::new(AtomicBool::new(notify_enabled));
+
         *STATE.lock().unwrap_or_else(|e| e.into_inner()) =
-            Some(PluginState { plugin_dir: dir, config: cfg.clone(), asr_thread: None });
+            Some(PluginState { plugin_dir: dir, config: cfg.clone(), asr_thread: None, notify_flag });
 
         if cfg.load_timing == "micyou_start" { start_asr_thread(); }
     }
@@ -606,6 +647,9 @@ pub extern "C" fn micyou_plugin_handle_message(_: *const c_char, topic: *const c
         if CStr::from_ptr(topic).to_str().unwrap_or("") == "config:changed" {
             if let Some(h) = HOST_API.lock().unwrap_or_else(|e| e.into_inner()).clone() {
                 let nt = read_cfg(&h, h.ctx, "loadTiming");
+                let nn_str = read_cfg(&h, h.ctx, "notifyModelStatus");
+                let nn = nn_str != "false";
+                
                 let mut restart = false;
                 {
                     let mut lk = STATE.lock().unwrap_or_else(|e| e.into_inner());
@@ -613,6 +657,10 @@ pub extern "C" fn micyou_plugin_handle_message(_: *const c_char, topic: *const c
                         if !nt.is_empty() && nt != s.config.load_timing { 
                             s.config.load_timing = nt; 
                             restart = true; 
+                        }
+                        if nn != s.config.notify_model_status {
+                            s.config.notify_model_status = nn;
+                            s.notify_flag.store(nn, Ordering::SeqCst);
                         }
                     }
                 }

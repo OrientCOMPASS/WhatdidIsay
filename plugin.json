@@ -1,7 +1,7 @@
 {
   "id": "opss.whatdidisay",
   "name": "WhatdidIsay",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "Transcribe your talk into text records every time you use MicYou.",
   "license": "Unlicense",
   "runtime": "native",
@@ -9,11 +9,17 @@
   "platforms": ["windows"],
   "arches": ["x86_64"],
   "apiVersion": 1,
-  "capabilities": ["config.read", "config.write", "dsp.node"],
+  "capabilities": [
+    "config.read", 
+    "config.write", 
+    "dsp.node", 
+    "message.send"
+  ],
   "kind": "dsp",
   "dsp": { "insertAfter": "AEC" },
   "config": {
-    "loadTiming": "device_connect"
+    "loadTiming": "device_connect",
+    "notifyModelStatus": true
   },
   "configSchema": {
     "fields": [
@@ -26,6 +32,12 @@
           { "value": "micyou_start", "label": "MicYou 启动时" },
           { "value": "device_connect", "label": "设备连接时" }
         ]
+      },
+      {
+        "key": "notifyModelStatus",
+        "fieldType": "boolean",
+        "label": "模型状态通知",
+        "default": true
       }
     ]
   }
