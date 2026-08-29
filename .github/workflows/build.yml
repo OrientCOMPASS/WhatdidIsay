@@ -1,46 +1,51 @@
-name: Manual Build & Package
+name: Build Native Binaries
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 仅允许手动触发
 
 jobs:
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # 允许单平台失败不影响其他平台
       matrix:
         include:
-          # Windows x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            ext: .dll
-            asset_name: WhatdidIsay.dll
-            platform: windows
+            bin: whatdidisay.dll     # ⚠️ 请确保与 Cargo.toml 中的 name 字段一致
+            name: Windows-x86_64
             
-          # Linux x86_64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            ext: .so
-            asset_name: libwhatdidisay.so
-            platform: linux
+            bin: libwhatdidisay.so   # ⚠️ 请确保与 Cargo.toml 中的 name 字段一致
+            name: Linux-x86_64
             
-          # macOS Intel (x86_64)
-          - os: macos-latest
+          - os: macos-13             # Intel Mac
             target: x86_64-apple-darwin
-            ext: .dylib
-            asset_name: libwhatdidisay.dylib
-            platform: macos
+            bin: libwhatdidisay.dylib
+            name: macOS-Intel
             
-          # 如果需要支持 Apple Silicon (M1/M2/M3)，取消下面这段的注释
-          # - os: macos-latest
-          #   target: aarch64-apple-darwin
-          #   ext: .dylib
-          #   asset_name: libwhatdidisay.dylib
-          #   platform: macos
+          - os: macos-latest         # Apple Silicon (M1/M2/M3)
+            target: aarch64-apple-darwin
+            bin: libwhatdidisay.dylib
+            name: macOS-ARM64
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # 【关键】安装 Linux 下 sherpa-onnx 链接所需的 C++ 和 CMake 依赖
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ pkg-config libssl-dev
+
+      # 安装 macOS 下的 cmake
+      - name: Install macOS Dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -50,45 +55,10 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Prepare Plugin Package
-        shell: bash
-        run: |
-          mkdir -p dist/opss.whatdidisay
-          cp README.md dist/opss.whatdidisay/
-          
-          # 复制编译产物并重命名
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            cp target/${{ matrix.target }}/release/whatdidisay.dll dist/opss.whatdidisay/${{ matrix.asset_name }}
-          else
-            cp target/${{ matrix.target }}/release/libwhatdidisay${{ matrix.ext }} dist/opss.whatdidisay/${{ matrix.asset_name }}
-          fi
-          
-          # 使用 Python 动态修改 plugin.json 的 entry 和 platforms 字段
-          python3 -c "
-          import json
-          with open('plugin.json', 'r', encoding='utf-8') as f:
-              data = json.load(f)
-          
-          data['entry'] = '${{ matrix.asset_name }}'
-          data['platforms'] = ['${{ matrix.platform }}']
-          # 移除可能冲突的 arches 字段，让宿主自动检测
-          if 'arches' in data:
-              del data['arches']
-              
-          with open('dist/opss.whatdidisay/plugin.json', 'w', encoding='utf-8') as f:
-              json.dump(data, f, indent=2, ensure_ascii=False)
-          "
-
-      - name: Zip Package
-        uses: thedoctor0/zip-release@main
-        with:
-          type: 'zip'
-          filename: 'whatdidisay-${{ matrix.platform }}-${{ matrix.target }}.zip'
-          path: 'dist/opss.whatdidisay'
-
-      - name: Upload Artifact for Manual Download
+      # 仅上传编译出的单一二进制文件
+      - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: whatdidisay-${{ matrix.platform }}
-          path: 'whatdidisay-${{ matrix.platform }}-${{ matrix.target }}.zip'
-          retention-days: 30 # Artifact 保留 30 天
+          name: whatdidisay-${{ matrix.name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.bin }}
+          retention-days: 30
