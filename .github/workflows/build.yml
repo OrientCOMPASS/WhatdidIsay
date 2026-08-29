@@ -8,7 +8,7 @@ jobs:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # 允许单平台失败不影响其他平台
+      fail-fast: false 
       matrix:
         include:
           - os: windows-latest
@@ -19,16 +19,14 @@ jobs:
             target: x86_64-unknown-linux-gnu
             name: Linux-x86_64
             
-          # 已放弃 macOS-Intel，仅保留 Apple Silicon (M1/M2/M3)
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macOS-ARM64
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # 【关键】安装 Linux 下 sherpa-onnx 链接所需的 C++ 和 CMake 依赖
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
         run: |
@@ -47,16 +45,14 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      # 调试：打印编译目录，确认产物真实文件名
       - name: Debug Build Output
         shell: bash
         run: |
           echo "Listing release directory..."
           ls -la target/${{ matrix.target }}/release/ || dir target\${{ matrix.target }}\release\
 
-      # 【核心修改】使用通配符直接上传二进制，无视文件名大小写
       - name: Upload Binary Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: whatdidisay-${{ matrix.name }}
           path: |
