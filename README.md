@@ -1,7 +1,3 @@
-以下是为您完全重构的 `README.md`。文档已全面反映最新的纯 Rust 架构（废弃 Python IPC）、自动多语言检测、跨插件广播协议，并针对 MicYou 的原生 `.zip` 导入机制重写了安装指南。
-
-***
-
 # WhatdidIsay - Real-time Speech Transcription for MicYou
 # WhatdidIsay - MicYou 实时语音转录插件
 
