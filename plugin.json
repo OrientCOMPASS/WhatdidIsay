@@ -5,7 +5,7 @@
   "description": "Transcribe your talk into text records every time you use MicYou.",
   "license": "Unlicense",
   "runtime": "native",
-  "entry": "WhatdidIsay.dll",
+  "entry": "WhatdidIsay",
   "platforms": ["linux", "windows", "macos"],
   "arches":["x86_64","aarch64"],
   "minHostVersion":"2.0.3",
